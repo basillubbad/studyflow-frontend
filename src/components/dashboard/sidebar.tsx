@@ -38,6 +38,7 @@ const navItems = [
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAppState } from "@/hooks/use-app-state";
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog";
+import { AuthService } from "@/services/auth.service";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
@@ -46,8 +47,9 @@ export function DashboardSidebar() {
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const user = state.userProfile;
 
-  const handleLogout = () => {
-    window.location.href = "/";
+  const handleLogout = async () => {
+    setIsLogoutDialogOpen(false);
+    await AuthService.logout();
   };
 
   return (

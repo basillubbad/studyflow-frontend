@@ -2,7 +2,8 @@
  * Centralized API Client for StudyFlow
  */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const LOCAL_BASE_URL = "/api";
 
 type RequestOptions = {
   method?: string;
@@ -11,13 +12,13 @@ type RequestOptions = {
   params?: Record<string, string>;
 };
 
-function buildUrl(endpoint: string, params?: Record<string, string>) {
+function buildUrl(baseUrl: string, endpoint: string, params?: Record<string, string>) {
   const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
-  const url = BASE_URL.startsWith("http")
-    ? new URL(`${BASE_URL}${normalizedEndpoint}`)
+  const url = baseUrl.startsWith("http")
+    ? new URL(`${baseUrl}${normalizedEndpoint}`)
     : new URL(
-        `${BASE_URL}${normalizedEndpoint}`,
+        `${baseUrl}${normalizedEndpoint}`,
         typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
       );
 
@@ -31,12 +32,13 @@ function buildUrl(endpoint: string, params?: Record<string, string>) {
 }
 
 async function request<T>(
+  baseUrl: string,
   endpoint: string,
   options: RequestOptions = {},
 ): Promise<T> {
   const { method = "GET", headers = {}, body, params } = options;
 
-  const url = buildUrl(endpoint, params);
+  const url = buildUrl(baseUrl, endpoint, params);
 
   // Define default headers
   const defaultHeaders: Record<string, string> = {
@@ -91,17 +93,37 @@ export const apiClient = {
     endpoint: string,
     params?: Record<string, string>,
     headers?: Record<string, string>,
-  ) => request<T>(endpoint, { method: "GET", params, headers }),
+  ) => request<T>(BACKEND_BASE_URL, endpoint, { method: "GET", params, headers }),
 
   post: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: "POST", body, headers }),
+    request<T>(BACKEND_BASE_URL, endpoint, { method: "POST", body, headers }),
 
   put: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: "PATCH", body, headers }),
+    request<T>(BACKEND_BASE_URL, endpoint, { method: "PATCH", body, headers }),
 
   patch: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: "PATCH", body, headers }),
+    request<T>(BACKEND_BASE_URL, endpoint, { method: "PATCH", body, headers }),
 
   delete: <T>(endpoint: string, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: "DELETE", headers }),
+    request<T>(BACKEND_BASE_URL, endpoint, { method: "DELETE", headers }),
+};
+
+export const localApiClient = {
+  get: <T>(
+    endpoint: string,
+    params?: Record<string, string>,
+    headers?: Record<string, string>,
+  ) => request<T>(LOCAL_BASE_URL, endpoint, { method: "GET", params, headers }),
+
+  post: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
+    request<T>(LOCAL_BASE_URL, endpoint, { method: "POST", body, headers }),
+
+  put: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
+    request<T>(LOCAL_BASE_URL, endpoint, { method: "PATCH", body, headers }),
+
+  patch: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
+    request<T>(LOCAL_BASE_URL, endpoint, { method: "PATCH", body, headers }),
+
+  delete: <T>(endpoint: string, headers?: Record<string, string>) =>
+    request<T>(LOCAL_BASE_URL, endpoint, { method: "DELETE", headers }),
 };

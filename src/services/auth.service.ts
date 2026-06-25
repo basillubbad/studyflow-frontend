@@ -171,10 +171,17 @@ export const AuthService = {
   /**
    * Logout user
    */
-  logout() {
+  async logout() {
+    try {
+      await apiClient.post("/logout");
+    } catch {
+      // Clear local session even if backend logout fails or token is already invalid.
+    }
+
     localStorage.removeItem("studyflow_auth_token");
     localStorage.removeItem("studyflow_user");
+    sessionStorage.removeItem("studyflow_user");
     AppStore.reset();
-    window.location.href = "/login";
+    window.location.replace("/login");
   }
 };

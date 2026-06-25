@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { apiClient } from "@/lib/api-client";
+import { localApiClient } from "@/lib/api-client";
 import { SearchResultItem } from "@/types/search";
 
 export function GlobalSearch() {
@@ -64,7 +64,7 @@ export function GlobalSearch() {
 
     const timeout = window.setTimeout(async () => {
       try {
-        const response = await apiClient.get<{ items: SearchResultItem[] }>("/search", {
+        const response = await localApiClient.get<{ items: SearchResultItem[] }>("/search", {
           q: trimmedQuery,
           limit: "8",
         });
