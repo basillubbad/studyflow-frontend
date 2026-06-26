@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { GraduationCap, Hash, Trophy, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { blurNumberInputOnWheel } from "@/lib/prevent-number-wheel";
 
 interface AcademicSettingsSectionProps {
   profile: UserProfile;
@@ -74,6 +75,7 @@ export function AcademicSettingsSection({ profile, onUpdate }: AcademicSettingsS
                 type="number"
                 value={profile.totalCreditHours}
                 onChange={(e) => onUpdate({ totalCreditHours: e.target.value })}
+                onWheel={blurNumberInputOnWheel}
                 className={cn("pl-9", isInvalid && "border-destructive focus-visible:ring-destructive")}
                 placeholder="e.g., 120"
               />
@@ -89,6 +91,7 @@ export function AcademicSettingsSection({ profile, onUpdate }: AcademicSettingsS
                 type="number"
                 value={profile.completedCreditHours}
                 onChange={(e) => onUpdate({ completedCreditHours: e.target.value })}
+                onWheel={blurNumberInputOnWheel}
                 className={cn("pl-9", isInvalid && "border-destructive focus-visible:ring-destructive")}
                 placeholder="e.g., 45"
               />

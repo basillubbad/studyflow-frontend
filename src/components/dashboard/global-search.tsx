@@ -100,12 +100,14 @@ export function GlobalSearch() {
     switch (category) {
       case "Course": return <BookOpen className="h-4 w-4 text-blue-500" />;
       case "Prior Course": return <BookMarked className="h-4 w-4 text-sky-500" />;
+      case "Semester": return <BookMarked className="h-4 w-4 text-indigo-500" />;
       case "Task": return <CheckSquare className="h-4 w-4 text-emerald-500" />;
       case "Exam": return <ClipboardList className="h-4 w-4 text-rose-500" />;
       case "Self-Learning": return <GraduationCap className="h-4 w-4 text-amber-500" />;
       case "Reflection": return <FileText className="h-4 w-4 text-violet-500" />;
       case "Notification": return <Bell className="h-4 w-4 text-red-500" />;
       case "Resource": return <Link2 className="h-4 w-4 text-cyan-500" />;
+      case "Focus": return <ClipboardList className="h-4 w-4 text-fuchsia-500" />;
       default: return <Search className="h-4 w-4" />;
     }
   };
@@ -119,7 +121,7 @@ export function GlobalSearch() {
         )} />
         <Input
           type="text"
-          placeholder="Search courses, tasks, exams..."
+          placeholder="Search the whole project..."
           className="pl-10 pr-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 transition-all rounded-xl h-10 w-full"
           value={query}
           onChange={(e) => {

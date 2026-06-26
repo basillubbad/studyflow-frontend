@@ -99,7 +99,7 @@ export const apiClient = {
     request<T>(BACKEND_BASE_URL, endpoint, { method: "POST", body, headers }),
 
   put: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(BACKEND_BASE_URL, endpoint, { method: "PATCH", body, headers }),
+    request<T>(BACKEND_BASE_URL, endpoint, { method: "PUT", body, headers }),
 
   patch: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>(BACKEND_BASE_URL, endpoint, { method: "PATCH", body, headers }),
@@ -119,7 +119,7 @@ export const localApiClient = {
     request<T>(LOCAL_BASE_URL, endpoint, { method: "POST", body, headers }),
 
   put: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(LOCAL_BASE_URL, endpoint, { method: "PATCH", body, headers }),
+    request<T>(LOCAL_BASE_URL, endpoint, { method: "PUT", body, headers }),
 
   patch: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>(LOCAL_BASE_URL, endpoint, { method: "PATCH", body, headers }),

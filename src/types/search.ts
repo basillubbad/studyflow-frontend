@@ -1,12 +1,14 @@
 export type SearchCategory =
   | "Course"
   | "Prior Course"
+  | "Semester"
   | "Task"
   | "Exam"
   | "Self-Learning"
   | "Reflection"
   | "Notification"
-  | "Resource";
+  | "Resource"
+  | "Focus";
 
 export interface SearchResultItem {
   id: string;

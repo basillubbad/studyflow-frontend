@@ -24,6 +24,27 @@ export function NotificationCenter() {
   React.useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
+
+  React.useEffect(() => {
+    const refreshNotifications = () => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications(true);
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void loadNotifications(true);
+    }, 15000);
+
+    document.addEventListener("visibilitychange", refreshNotifications);
+    window.addEventListener("focus", refreshNotifications);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshNotifications);
+      window.removeEventListener("focus", refreshNotifications);
+    };
+  }, [loadNotifications]);
   
   const notifications = state.notifications || [];
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -42,6 +63,7 @@ export function NotificationCenter() {
 
     try {
       await DataService.markNotificationAsRead(id);
+      void loadNotifications(true);
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
@@ -59,6 +81,7 @@ export function NotificationCenter() {
 
     try {
       await DataService.markAllNotificationsAsRead();
+      void loadNotifications(true);
     } catch (error) {
       console.error("Failed to mark all notifications as read", error);
     }
@@ -69,22 +92,23 @@ export function NotificationCenter() {
 
     try {
       await DataService.clearAllNotifications();
+      void loadNotifications(true);
     } catch (error) {
       console.error("Failed to clear notifications", error);
     }
   };
 
   const sortedNotifications = [...notifications].sort((a, b) => {
+    const aDate = a.eventDate || a.createdAt;
+    const bDate = b.eventDate || b.createdAt;
+    const dateDiff = new Date(bDate).getTime() - new Date(aDate).getTime();
+    if (dateDiff !== 0) return dateDiff;
+
     const unreadDiff = Number(a.read) - Number(b.read);
     if (unreadDiff !== 0) return unreadDiff;
 
     const severityOrder = { critical: 0, warning: 1, info: 2, success: 3 };
-    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-    if (severityDiff !== 0) return severityDiff;
-
-    const aDate = a.eventDate || a.createdAt;
-    const bDate = b.eventDate || b.createdAt;
-    return new Date(aDate).getTime() - new Date(bDate).getTime();
+    return severityOrder[a.severity] - severityOrder[b.severity];
   });
 
   return (

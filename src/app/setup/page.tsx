@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, ArrowRight, CheckCircle, GraduationCap, Loader2 } from "lucide-react"
+import { blurNumberInputOnWheel } from "@/lib/prevent-number-wheel"
 
 const steps = [
   { id: 1, title: "Academic Year" },
@@ -190,6 +191,7 @@ export default function SetupPage() {
                     placeholder="e.g., 120"
                     value={formData.totalCreditHours}
                     onChange={(e) => setFormData({ ...formData, totalCreditHours: e.target.value })}
+                    onWheel={blurNumberInputOnWheel}
                     className="h-12"
                   />
                 </div>
@@ -204,6 +206,7 @@ export default function SetupPage() {
                     placeholder="e.g., 45"
                     value={formData.completedCreditHours}
                     onChange={(e) => setFormData({ ...formData, completedCreditHours: e.target.value })}
+                    onWheel={blurNumberInputOnWheel}
                     className="h-12"
                   />
                 </div>
@@ -257,6 +260,7 @@ export default function SetupPage() {
                   placeholder="e.g., 3.50 or 85"
                   value={formData.currentGPA}
                   onChange={(e) => setFormData({ ...formData, currentGPA: e.target.value })}
+                  onWheel={blurNumberInputOnWheel}
                   className="h-12"
                 />
                 <p className="text-xs text-muted-foreground">

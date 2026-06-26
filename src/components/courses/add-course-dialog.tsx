@@ -59,6 +59,10 @@ export function AddCourseDialog({
 }: AddCourseDialogProps) {
   const { state } = useAppState();
   const semesters = state.academicPlanning.semesters;
+  const selectableSemesters = useMemo(
+    () => semesters.filter((s) => s.id !== "prior-completed"),
+    [semesters],
+  );
   const allStateCourses = state.courses;
 
   const [formData, setFormData] = useState<Omit<Course, "id">>(defaultFormData);
@@ -87,14 +91,14 @@ export function AddCourseDialog({
       };
     }
 
-    const selectedSemester = semesters.find((s) => s.id === semesterId);
+    const selectedSemester = selectableSemesters.find((s) => s.id === semesterId);
     return {
       ...defaultFormData,
       semesterId: semesterId || "",
       status: semesterId === "prior-completed" ? "completed" : defaultFormData.status,
       durationWeeks: selectedSemester ? selectedSemester.weeksCount : defaultFormData.durationWeeks,
     };
-  }, [initialData, isEditing, semesterId, semesters]);
+  }, [initialData, isEditing, semesterId, selectableSemesters]);
 
   useEffect(() => {
     if (!open) return;
@@ -388,7 +392,7 @@ export function AddCourseDialog({
                             <Select 
                                 value={formData.semesterId || undefined}
                                 onValueChange={(val) => {
-                                  const selectedSemester = semesters.find((s) => s.id === val);
+                                  const selectedSemester = selectableSemesters.find((s) => s.id === val);
                                   setFormData({
                                     ...formData,
                                     semesterId: val,
@@ -396,17 +400,22 @@ export function AddCourseDialog({
                                   });
                                 }}
                             >
-                                <SelectTrigger id="semester" className="w-full">
+                                <SelectTrigger id="semester" className="w-full" disabled={selectableSemesters.length === 0}>
                                     <SelectValue placeholder="Select a semester" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {semesters.map(s => (
+                                    {selectableSemesters.map(s => (
                                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         )}
                         {errors.semesterId && <p className="text-sm text-red-500">{errors.semesterId}</p>}
+                        {!semesterId && selectableSemesters.length === 0 && (
+                          <p className="text-xs text-amber-600">
+                            No semesters available yet. Add a semester first from Academic Planning.
+                          </p>
+                        )}
                     </div>
 
 

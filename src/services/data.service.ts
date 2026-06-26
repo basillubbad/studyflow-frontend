@@ -38,15 +38,100 @@ const asOptionalNumber = (value: unknown): number | undefined => {
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
+function normalizeTaskStatus(status: unknown): TaskItem["status"] {
+  const value = asString(status, "todo");
+
+  switch (value) {
+    case "done":
+    case "completed":
+      return "done";
+    case "in-progress":
+    case "in_progress":
+      return "in-progress";
+    default:
+      return "todo";
+  }
+}
+
+function mapTaskFromBackend(task: BackendRecord): TaskItem {
+  return {
+    id: asString(task.id),
+    title: asString(task.title),
+    description: asOptionalString(task.description),
+    type: asString(task.type, "general") as TaskItem["type"],
+    sourceModule: asString(task.sourceModule ?? task.source_module, "general") as TaskItem["sourceModule"],
+    linkedCourseId: asOptionalString(task.linkedCourseId ?? task.linked_course_id ?? task.course_id),
+    linkedCourseTitle: asOptionalString(task.linkedCourseTitle ?? task.linked_course_title ?? task.course_title),
+    linkedWeekId: asOptionalString(task.linkedWeekId ?? task.linked_week_id),
+    linkedWeekLabel: asOptionalString(task.linkedWeekLabel ?? task.linked_week_label),
+    linkedLearningPlanId: asOptionalString(task.linkedLearningPlanId ?? task.linked_learning_plan_id),
+    linkedLearningPlanTitle: asOptionalString(task.linkedLearningPlanTitle ?? task.linked_learning_plan_title),
+    dueDate: asOptionalString(task.dueDate ?? task.due_date),
+    dueTime: asOptionalString(task.dueTime ?? task.due_time),
+    priority: asString(task.priority, "medium") as TaskItem["priority"],
+    status: normalizeTaskStatus(task.status),
+    previousStatus: asOptionalString(task.previousStatus ?? task.previous_status) as TaskItem["previousStatus"],
+    recurrence: (() => {
+      const recurrence = task.recurrence;
+      return recurrence && typeof recurrence === "object"
+        ? (recurrence as TaskItem["recurrence"])
+        : undefined;
+    })(),
+    savedRecurrence: (() => {
+      const savedRecurrence = task.savedRecurrence ?? task.saved_recurrence;
+      return savedRecurrence && typeof savedRecurrence === "object"
+        ? (savedRecurrence as TaskItem["savedRecurrence"])
+        : undefined;
+    })(),
+    reminder: Boolean(task.reminder),
+    reminderConfig: (() => {
+      const reminderConfig = task.reminderConfig ?? task.reminder_config;
+      return reminderConfig && typeof reminderConfig === "object"
+        ? (reminderConfig as TaskItem["reminderConfig"])
+        : undefined;
+    })(),
+    notes: asOptionalString(task.notes),
+    createdAt: asString(task.createdAt ?? task.created_at, new Date().toISOString()),
+    updatedAt: asString(task.updatedAt ?? task.updated_at, new Date().toISOString()),
+  };
+}
+
+function mapTaskToBackend(task: Partial<TaskItem>): Record<string, unknown> {
+  return {
+    title: task.title,
+    description: task.description,
+    type: task.type,
+    priority: task.priority,
+    status: task.status,
+    course_id: task.linkedCourseId || null,
+    due_date: task.dueDate || null,
+    due_time: task.dueTime || null,
+    linkedWeekLabel: task.linkedWeekLabel,
+    reminder: task.reminderConfig?.enabled ?? task.reminder ?? false,
+    reminderConfig: task.reminderConfig,
+    recurrence: task.recurrence,
+  };
+}
+
 function mapCourseFromBackend(course: BackendRecord): Course {
   const weeklyPlans = asArray<BackendRecord>(course.weekly_plans ?? course.weeklyPlan);
+  const isPriorCompleted = Boolean(
+    course.is_prior_completed ??
+      course.isPriorCompleted ??
+      ((course.academic_period ?? course.academicPeriod) &&
+        !asOptionalString(course.semester_id ?? course.semesterId)) ??
+      (!asOptionalString(course.semester_id ?? course.semesterId) &&
+        asString(course.status) === "completed"),
+  );
 
   return {
     id: asString(course.id),
     title: asString(course.title),
     instructor: asString(course.instructor),
     credits: asNumber(course.credits, 0),
-    semesterId: asOptionalString(course.semester_id ?? course.semesterId),
+    semesterId: isPriorCompleted
+      ? "prior-completed"
+      : asOptionalString(course.semester_id ?? course.semesterId),
     status: asString(course.status, "planned") as Course["status"],
     imageUrl: asString(course.image_url ?? course.imageUrl),
     durationWeeks: asNumber(course.duration_weeks ?? course.durationWeeks, 16),
@@ -77,12 +162,15 @@ function mapWeeklyPlanFromBackend(week: BackendRecord): WeeklyPlan {
 }
 
 function mapCourseToBackend(course: Partial<Course>): Record<string, unknown> {
+  const isPriorCompleted = course.semesterId === "prior-completed";
+
   return {
     id: course.id,
     title: course.title,
     instructor: course.instructor,
     credits: course.credits,
-    semester_id: course.semesterId === "prior-completed" ? null : (course.semesterId || null),
+    semester_id: isPriorCompleted ? null : (course.semesterId || null),
+    is_prior_completed: isPriorCompleted,
     status: course.status,
     image_url: course.imageUrl,
     duration_weeks: course.durationWeeks,
@@ -184,15 +272,18 @@ export const DataService = {
   },
 
   async getTasks(): Promise<TaskItem[]> {
-    return apiClient.get<TaskItem[]>("/tasks");
+    const data = await apiClient.get<BackendRecord[]>("/tasks");
+    return Array.isArray(data) ? data.map(mapTaskFromBackend) : [];
   },
 
   async createTask(task: Omit<TaskItem, "id">): Promise<TaskItem> {
-    return apiClient.post<TaskItem>("/tasks", task);
+    const response = await apiClient.post<BackendRecord>("/tasks", mapTaskToBackend(task));
+    return mapTaskFromBackend(response);
   },
 
   async updateTask(task: TaskItem): Promise<TaskItem> {
-    return apiClient.put<TaskItem>(`/tasks/${task.id}`, task);
+    const response = await apiClient.put<BackendRecord>(`/tasks/${task.id}`, mapTaskToBackend(task));
+    return mapTaskFromBackend(response);
   },
 
   async deleteTask(id: string): Promise<void> {

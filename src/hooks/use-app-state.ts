@@ -223,11 +223,17 @@ export function useAppState() {
     } catch (err) { console.error("Failed to load reflections", err); }
   }, []);
 
-  const loadNotifications = useCallback(async () => {
-    if (AppStore.get().loadedModules.includes('notifications')) return;
+  const loadNotifications = useCallback(async (force = false) => {
+    if (!force && AppStore.get().loadedModules.includes('notifications')) return;
     try {
       const notifications = await DataService.getNotifications();
-      AppStore.update(prev => ({ ...prev, notifications, loadedModules: [...prev.loadedModules, 'notifications'] }));
+      AppStore.update(prev => ({
+        ...prev,
+        notifications,
+        loadedModules: prev.loadedModules.includes('notifications')
+          ? prev.loadedModules
+          : [...prev.loadedModules, 'notifications']
+      }));
     } catch (err) { console.error("Failed to load notifications", err); }
   }, []);
 
@@ -313,15 +319,15 @@ export function useAppState() {
   const updateTask = useCallback(async (task: TaskItem) => {
     try {
       const saved = await DataService.updateTask(task);
-      AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => t.id === saved.id ? saved : t) }));
+      AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => String(t.id) === String(saved.id) ? saved : t) }));
     } catch {
-      AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => t.id === task.id ? task : t) }));
+      AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => String(t.id) === String(task.id) ? task : t) }));
     }
   }, []);
 
   const deleteTask = useCallback(async (id: string) => {
     try { await DataService.deleteTask(id); } catch { console.error("Failed to delete task"); }
-    AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+    AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.filter(t => String(t.id) !== String(id)) }));
   }, []);
 
   // ─── Learning Plans ─────────────────────────────────────────────────────────
@@ -579,7 +585,7 @@ export function useAppState() {
     // Tasks عادية — نحفظها على الباك
     const prefixes = ["milestone-", "sl-task-", "w-assign-", "w-exam-", "w-task-", "assign-", "event-", "w-item-"];
     if (prefixes.some(p => task.id.startsWith(p))) {
-      AppStore.update(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === task.id ? task : t) }));
+      AppStore.update(prev => ({ ...prev, tasks: prev.tasks.map(t => String(t.id) === String(task.id) ? task : t) }));
       return;
     }
 
@@ -588,9 +594,9 @@ export function useAppState() {
       // تعديل task موجودة
       try {
         const saved = await DataService.updateTask(task);
-        AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => t.id === saved.id ? saved : t) }));
+        AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => String(t.id) === String(saved.id) ? saved : t) }));
       } catch {
-        AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => t.id === task.id ? task : t) }));
+        AppStore.update(prev => keepStreakAlive({ ...prev, tasks: prev.tasks.map(t => String(t.id) === String(task.id) ? task : t) }));
       }
     } else {
       // إضافة task جديدة
