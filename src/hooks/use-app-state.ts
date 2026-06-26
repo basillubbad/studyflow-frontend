@@ -10,6 +10,10 @@ import { LearningPlan } from "@/types/self-learning";
 import { ReflectionEntry } from "@/types/reflections";
 import { DataService } from "@/services/data.service";
 
+let hasBootstrappedSession = false;
+let profileRequest: Promise<void> | null = null;
+const pendingModuleLoads = new Map<string, Promise<void>>();
+
 // ─── Pure helper functions (outside hook, no dependency issues) ───────────────
 
 function keepStreakAlive(state: AppState): AppState {
@@ -99,64 +103,70 @@ export function useAppState() {
     });
 
     if (token) {
-      // Load from localStorage first (instant display)
-      const savedUser = localStorage.getItem("studyflow_user");
-      if (savedUser) {
-        try {
-          const parsed = JSON.parse(savedUser);
-          // Parse reminder_preferences if it's a JSON string
-          let reminderPrefs = parsed.reminderPreferences || parsed.reminder_preferences;
-          if (typeof reminderPrefs === "string") {
-            try { reminderPrefs = JSON.parse(reminderPrefs); } catch { reminderPrefs = null; }
+      if (!hasBootstrappedSession) {
+        hasBootstrappedSession = true;
+        const savedUser = localStorage.getItem("studyflow_user");
+        if (savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            let reminderPrefs = parsed.reminderPreferences || parsed.reminder_preferences;
+            if (typeof reminderPrefs === "string") {
+              try { reminderPrefs = JSON.parse(reminderPrefs); } catch { reminderPrefs = null; }
+            }
+            const normalized = {
+              ...parsed,
+              academicYear: parsed.academicYear || parsed.academic_year || "",
+              totalCreditHours: parsed.totalCreditHours || parsed.total_credit_hours?.toString() || "",
+              completedCreditHours: parsed.completedCreditHours || parsed.completed_credit_hours?.toString() || "",
+              currentGPA: parsed.currentGPA || parsed.current_gpa?.toString() || "",
+              onboardingCompleted: parsed.onboardingCompleted ?? parsed.onboarding_completed ?? false,
+              avatarUrl: parsed.avatarUrl || parsed.avatar_url || undefined,
+              reminderPreferences: {
+                remindersEnabled: true,
+                defaultReminderTiming: 15,
+                defaultReminderUnit: "minutes",
+                emailNotificationsEnabled: false,
+                inAppNotificationsEnabled: true,
+                ...(reminderPrefs || {}),
+              },
+              focusPreferences: {
+                preferredSessionDuration: 25,
+                preferredBreakDuration: 5,
+                autoStartBreak: false,
+                defaultFocusMode: "pomodoro",
+                ...(parsed.focusPreferences || parsed.focus_preferences || {}),
+              },
+            };
+            AppStore.update({ userProfile: normalized });
+          } catch {
+            // ignore parse errors
           }
-          // Normalize both camelCase and snake_case fields from cache
-          const normalized = {
-            ...parsed,
-            academicYear: parsed.academicYear || parsed.academic_year || "",
-            totalCreditHours: parsed.totalCreditHours || parsed.total_credit_hours?.toString() || "",
-            completedCreditHours: parsed.completedCreditHours || parsed.completed_credit_hours?.toString() || "",
-            currentGPA: parsed.currentGPA || parsed.current_gpa?.toString() || "",
-            onboardingCompleted: parsed.onboardingCompleted ?? parsed.onboarding_completed ?? false,
-            avatarUrl: parsed.avatarUrl || parsed.avatar_url || undefined,
-            reminderPreferences: {
-              remindersEnabled: true,
-              defaultReminderTiming: 15,
-              defaultReminderUnit: "minutes",
-              emailNotificationsEnabled: false,
-              inAppNotificationsEnabled: true,
-              ...(reminderPrefs || {}),
-            },
-            focusPreferences: {
-              preferredSessionDuration: 25,
-              preferredBreakDuration: 5,
-              autoStartBreak: false,
-              defaultFocusMode: "pomodoro",
-              ...(parsed.focusPreferences || parsed.focus_preferences || {}),
-            },
-          };
-          AppStore.update({ userProfile: normalized });
-        } catch {
-          // ignore parse errors
         }
       }
 
-      // Fetch fresh profile from API and update store
-      import("@/services/auth.service").then(({ AuthService }) => {
-        return AuthService.getProfile();
-      }).then((profile) => {
-        // Update full userProfile (already mapped to camelCase by AuthService)
-        AppStore.update((prev) => ({
-          ...prev,
-          userProfile: { ...prev.userProfile, ...profile },
-          streak: profile?.streak || prev.streak,
-        }));
-      }).catch((err) => {
-        console.error("Failed to load profile", err);
-      }).finally(() => {
-        setState(AppStore.get());
-        setIsLoaded(true);
-      });
+      setState(AppStore.get());
+      setIsLoaded(true);
+
+      if (!profileRequest) {
+        profileRequest = import("@/services/auth.service")
+          .then(({ AuthService }) => AuthService.getProfile())
+          .then((profile) => {
+            AppStore.update((prev) => ({
+              ...prev,
+              userProfile: { ...prev.userProfile, ...profile },
+              streak: profile?.streak || prev.streak,
+            }));
+          })
+          .catch((err) => {
+            console.error("Failed to load profile", err);
+          })
+          .finally(() => {
+            profileRequest = null;
+          });
+      }
     } else {
+      hasBootstrappedSession = false;
+      profileRequest = null;
       setTimeout(() => {
         setState(AppStore.get());
         setIsLoaded(true);
@@ -181,30 +191,61 @@ export function useAppState() {
   
   const loadCourses = useCallback(async () => {
     if (AppStore.get().loadedModules.includes('courses')) return;
+    const pending = pendingModuleLoads.get('courses');
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const courses = await DataService.getCourses();
       AppStore.update(prev => ({ ...prev, courses, loadedModules: [...prev.loadedModules, 'courses'] }));
     } catch (err) { console.error("Failed to load courses", err); }
+    finally { pendingModuleLoads.delete('courses'); }
+    })();
+
+    pendingModuleLoads.set('courses', request);
+    return request;
   }, []);
 
   const loadTasks = useCallback(async () => {
     if (AppStore.get().loadedModules.includes('tasks')) return;
+    const pending = pendingModuleLoads.get('tasks');
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const tasks = await DataService.getTasks();
       AppStore.update(prev => ({ ...prev, tasks, loadedModules: [...prev.loadedModules, 'tasks'] }));
     } catch (err) { console.error("Failed to load tasks", err); }
+    finally { pendingModuleLoads.delete('tasks'); }
+    })();
+
+    pendingModuleLoads.set('tasks', request);
+    return request;
   }, []);
 
   const loadLearningPlans = useCallback(async () => {
     if (AppStore.get().loadedModules.includes('learningPlans')) return;
+    const pending = pendingModuleLoads.get('learningPlans');
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const selfLearningPlans = await DataService.getLearningPlans();
       AppStore.update(prev => ({ ...prev, selfLearningPlans, loadedModules: [...prev.loadedModules, 'learningPlans'] }));
     } catch (err) { console.error("Failed to load learning plans", err); }
+    finally { pendingModuleLoads.delete('learningPlans'); }
+    })();
+
+    pendingModuleLoads.set('learningPlans', request);
+    return request;
   }, []);
 
   const loadSemesters = useCallback(async () => {
     if (AppStore.get().loadedModules.includes('semesters')) return;
+    const pending = pendingModuleLoads.get('semesters');
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const semesters = await DataService.getSemesters();
       AppStore.update(prev => ({ 
@@ -213,20 +254,40 @@ export function useAppState() {
         loadedModules: [...prev.loadedModules, 'semesters'] 
       }));
     } catch (err) { console.error("Failed to load semesters", err); }
+    finally { pendingModuleLoads.delete('semesters'); }
+    })();
+
+    pendingModuleLoads.set('semesters', request);
+    return request;
   }, []);
 
   const loadReflections = useCallback(async () => {
     if (AppStore.get().loadedModules.includes('reflections')) return;
+    const pending = pendingModuleLoads.get('reflections');
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const reflections = await DataService.getReflections();
       AppStore.update(prev => ({ ...prev, reflections, loadedModules: [...prev.loadedModules, 'reflections'] }));
     } catch (err) { console.error("Failed to load reflections", err); }
+    finally { pendingModuleLoads.delete('reflections'); }
+    })();
+
+    pendingModuleLoads.set('reflections', request);
+    return request;
   }, []);
 
   const loadNotifications = useCallback(async (force = false) => {
     if (!force && AppStore.get().loadedModules.includes('notifications')) return;
+    if (!force) {
+      const pending = pendingModuleLoads.get('notifications');
+      if (pending) return pending;
+    }
+
+    const request = (async () => {
     try {
-      const notifications = await DataService.getNotifications();
+      const notifications = await DataService.getNotifications({ sync: force });
       AppStore.update(prev => ({
         ...prev,
         notifications,
@@ -235,6 +296,18 @@ export function useAppState() {
           : [...prev.loadedModules, 'notifications']
       }));
     } catch (err) { console.error("Failed to load notifications", err); }
+    finally {
+      if (!force) {
+        pendingModuleLoads.delete('notifications');
+      }
+    }
+    })();
+
+    if (!force) {
+      pendingModuleLoads.set('notifications', request);
+    }
+
+    return request;
   }, []);
 
   // ─── Semesters ──────────────────────────────────────────────────────────────

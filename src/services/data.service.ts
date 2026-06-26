@@ -418,7 +418,11 @@ export const DataService = {
     return apiClient.delete(`/exam-prep/${weekItemId}/topics/${topicId}`);
   },
 
-  async getNotifications(): Promise<Notification[]> {
+  async getNotifications(options?: { sync?: boolean }): Promise<Notification[]> {
+    if (options?.sync) {
+      await apiClient.post("/notifications/sync");
+    }
+
     const data = await apiClient.get<BackendRecord[]>("/notifications");
     return data.map((notification) => ({
       id: asString(notification.id),

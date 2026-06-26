@@ -20,9 +20,21 @@ export function NotificationCenter() {
   const { state, updateState, loadNotifications } = useAppState();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const hasLoadedRef = React.useRef(false);
   
   React.useEffect(() => {
-    loadNotifications();
+    const loadWhenIdle = () => {
+      hasLoadedRef.current = true;
+      void loadNotifications();
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(loadWhenIdle, { timeout: 4000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(loadWhenIdle, 2500);
+    return () => window.clearTimeout(timeoutId);
   }, [loadNotifications]);
 
   React.useEffect(() => {
@@ -34,7 +46,7 @@ export function NotificationCenter() {
 
     const interval = window.setInterval(() => {
       void loadNotifications(true);
-    }, 15000);
+    }, 60000);
 
     document.addEventListener("visibilitychange", refreshNotifications);
     window.addEventListener("focus", refreshNotifications);
@@ -45,6 +57,12 @@ export function NotificationCenter() {
       window.removeEventListener("focus", refreshNotifications);
     };
   }, [loadNotifications]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    hasLoadedRef.current = true;
+    void loadNotifications(true);
+  }, [loadNotifications, open]);
   
   const notifications = state.notifications || [];
   const unreadCount = notifications.filter(n => !n.read).length;
